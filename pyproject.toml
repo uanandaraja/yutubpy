@@ -14,4 +14,11 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 
-dependencies = ["fastapi", "pydantic", "uvicorn", "yt-dlp"]
+dependencies = [
+  "fastapi",
+  "pydantic",
+  "uvicorn",
+  "yt-dlp",
+  "boto3",
+  "python-dotenv",
+]

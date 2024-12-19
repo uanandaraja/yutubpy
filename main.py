@@ -1,62 +1,38 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import io
-import tempfile
+import boto3
 import logging
+from botocore.config import Config
 import yt_dlp
-from starlette.background import BackgroundTask
+import tempfile
+import os
+from dotenv import load_dotenv
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+# Configure R2 client
+s3 = boto3.client(
+    's3',
+    endpoint_url=os.getenv('R2_ENDPOINT'),
+    aws_access_key_id=os.getenv('R2_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.getenv('R2_SECRET_ACCESS_KEY'),
+    config=Config(signature_version='s3v4'),
+    region_name='auto'
+)
 
 
 class VideoURL(BaseModel):
     url: str
 
 
-async def download_and_convert(url: str):
-    try:
-        logger.info(f"Starting download for URL: {url}")
-
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'outtmpl': '%(id)s.%(ext)s'
-        }
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            ydl_opts['outtmpl'] = f'{temp_dir}/%(id)s.%(ext)s'
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                logger.info("Downloading and converting")
-                info = ydl.extract_info(url, download=True)
-                filename = f"{temp_dir}/{info['id']}.mp3"
-
-                logger.info("Reading MP3 file")
-                with open(filename, 'rb') as f:
-                    mp3_data = f.read()
-                return mp3_data
-
-    except Exception as e:
-        logger.error(f"Error during processing: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Error during processing: {str(e)}")
-
-
 @app.post("/download")
 async def download(video: VideoURL):
     try:
-        logger.info(f"Received request for URL: {video.url}")
         temp_dir = tempfile.mkdtemp()
 
         ydl_opts = {
@@ -73,24 +49,27 @@ async def download(video: VideoURL):
             info = ydl.extract_info(video.url, download=True)
             filename = f"{temp_dir}/{info['id']}.mp3"
 
-            async def file_iterator():
-                with open(filename, 'rb') as f:
-                    while chunk := f.read(8192):
-                        yield chunk
+            # Upload to R2
+            bucket_name = os.getenv('R2_BUCKET_NAME')
+            object_key = f"{info['id']}.mp3"
 
-            def cleanup():
-                import os
-                os.remove(filename)
-                os.rmdir(temp_dir)
-                logger.info(f"Cleaned up {filename}")
+            s3.upload_file(filename, bucket_name, object_key)
 
-            return StreamingResponse(
-                file_iterator(),
-                media_type="audio/mpeg",
-                headers={
-                    "Content-Disposition": f'attachment; filename="audio.mp3"'},
-                background=BackgroundTask(cleanup)
+            # Generate signed URL
+            url = s3.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': bucket_name,
+                    'Key': object_key
+                },
+                ExpiresIn=3600  # URL expires in 1 hour
             )
+
+            # Cleanup
+            os.remove(filename)
+            os.rmdir(temp_dir)
+
+            return {"url": url}
 
     except Exception as e:
         logger.error(f"Error: {str(e)}", exc_info=True)
@@ -98,4 +77,4 @@ async def download(video: VideoURL):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8080)
