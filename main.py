@@ -36,11 +36,12 @@ async def download(video: VideoURL):
         temp_dir = tempfile.mkdtemp()
 
         ydl_opts = {
-            'format': 'bestaudio/best',
+            'format': 'worstaudio',
+            'cookiesfile': 'cookies.txt',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
-                'preferredquality': '192',
+                'preferredquality': '64',
             }],
             'outtmpl': f'{temp_dir}/%(id)s.%(ext)s'
         }
