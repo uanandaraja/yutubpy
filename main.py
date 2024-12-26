@@ -37,7 +37,7 @@ async def download(video: VideoURL):
 
         ydl_opts = {
             'format': 'worstaudio',
-            'cookiesfile': 'cookies.txt',
+            'cookiefile': '/app/cookies.txt',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
