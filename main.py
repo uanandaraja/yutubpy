@@ -78,4 +78,5 @@ async def download(video: VideoURL):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=os.getenv("PORT"))
+    port = int(os.getenv("PORT", "7000"))  # Default to 8000 if PORT is not set
+    uvicorn.run(app, host="0.0.0.0", port=port)
