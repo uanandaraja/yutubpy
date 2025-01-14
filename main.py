@@ -36,23 +36,19 @@ async def download(video: VideoURL):
         temp_dir = tempfile.mkdtemp()
 
         ydl_opts = {
-            'format': 'worstaudio',
+            'format': 'bestaudio[ext=mp3]/bestaudio',
             'cookiefile': '/app/cookies.txt',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '64',
-            }],
             'outtmpl': f'{temp_dir}/%(id)s.%(ext)s'
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video.url, download=True)
-            filename = f"{temp_dir}/{info['id']}.mp3"
+            ext = info['ext']
+            filename = f"{temp_dir}/{info['id']}.{ext}"
 
             # Upload to R2
             bucket_name = os.getenv('R2_BUCKET_NAME')
-            object_key = f"{info['id']}.mp3"
+            object_key = f"{info['id']}.{ext}"
 
             s3.upload_file(filename, bucket_name, object_key)
 

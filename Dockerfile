@@ -6,7 +6,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends ffmpeg curl && \
     rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml main.py ./
+COPY pyproject.toml main.py .env ./
 
 RUN curl -o cookies.txt https://storage.nizzy.xyz/cookies.txt && \
     pip install --no-cache-dir .
