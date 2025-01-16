@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import boto3
 import logging
@@ -14,6 +15,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://rangkumin.xyz", "http://localhost:4000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Configure R2 client
 s3 = boto3.client(
@@ -74,5 +84,5 @@ async def download(video: VideoURL):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", "7000"))  # Default to 8000 if PORT is not set
+    port = int(os.getenv("PORT", "7000"))
     uvicorn.run(app, host="0.0.0.0", port=port)
